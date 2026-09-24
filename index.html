@@ -443,12 +443,36 @@
     d.setHours(h || 0, m || 0, 0, 0);
     return d;
   }
+  function loggedMealNs() {
+    return new Set(todaysFeeds().map(f => Number(f.mealN)).filter(n => n > 0));
+  }
+  function inferMealN(when) {
+    const times = (S.puppy.mealTimes || []).filter(Boolean);
+    const at = when || new Date();
+    if (!times.length) return todaysFeeds().length + 1;
+    let best = 1, bestDiff = Infinity;
+    times.forEach((hm, i) => {
+      const d = Math.abs(parseHM(hm).getTime() - at.getTime());
+      if (d < bestDiff) { bestDiff = d; best = i + 1; }
+    });
+    const used = loggedMealNs();
+    if (!used.has(best)) return best;
+    for (let i = 0; i < times.length; i++) {
+      const n = i + 1;
+      if (used.has(n)) continue;
+      if (parseHM(times[i]).getTime() >= at.getTime() - 20 * 60000) return n;
+    }
+    for (let n = 1; n <= times.length; n++) if (!used.has(n)) return n;
+    return best;
+  }
   function nextMealTime() {
     const times = (S.puppy.mealTimes || []).filter(Boolean);
     if (!times.length) return null;
+    const used = loggedMealNs();
     const now = new Date();
-    for (const t of times) {
-      const d = parseHM(t);
+    for (let i = 0; i < times.length; i++) {
+      if (used.has(i + 1)) continue;
+      const d = parseHM(times[i]);
       if (d.getTime() > now.getTime() - 2 * 60000) return d;
     }
     const d = parseHM(times[0]);
@@ -744,6 +768,14 @@
         <p class="tiny">${changeLine}</p>
         <p class="tiny">${(S.puppy.foods || []).map(f => typeof f === "string" ? f : f.name).join(" · ")}</p>
         <button class="btn ghost block" style="margin-top:10px" data-goto="feed">See full feeding plan</button>
+        <p class="tiny" style="margin-top:10px">Forgot to tap this morning?</p>
+        <div class="row">
+          <input class="field" id="missedTime" type="time" value="${(S.puppy.mealTimes && S.puppy.mealTimes[0]) || "07:30"}" style="flex:1" />
+          <select class="field" id="missedN" style="flex:1">
+            ${(S.puppy.mealTimes || ["1","2","3","4"]).map((t,i) => `<option value="${i+1}">Meal ${i+1}${t && t.includes(":") ? " · " + t : ""}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn ghost sm" id="addMissed" style="margin-top:8px">Add missed meal</button>
       </div>
       ${napCardHTML(w)}
       <div class="card">
@@ -818,6 +850,14 @@
           <button class="btn sage" data-fed="yes">I FED DAISY</button>
         </div>
         ${toastHTML()}
+        <p class="tiny" style="margin-top:12px">Add a meal you already gave, at the time it happened.</p>
+        <div class="row">
+          <input class="field" id="missedTime" type="time" value="${(S.puppy.mealTimes && S.puppy.mealTimes[0]) || "07:30"}" style="flex:1" />
+          <select class="field" id="missedN" style="flex:1">
+            ${times.map((t,i) => `<option value="${i+1}">Meal ${i+1} · ${t}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn ghost sm" id="addMissed" style="margin-top:8px">Add missed meal</button>
       </div>
       <div class="card">
         <h2>When to drop a meal</h2>
@@ -1242,11 +1282,27 @@
     };
     document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => { tab = b.dataset.goto; render(); });
     document.querySelectorAll("[data-open-skill]").forEach(b => b.onclick = () => { tab = "train"; render(); });
-    document.querySelectorAll("[data-fed]").forEach(b => b.onclick = () => {
+    function stampToday(hm) {
+      const d = parseHM(hm || "07:30");
+      if (d.getTime() > Date.now() + 2 * 60000) d.setDate(d.getDate() - 1);
+      return d;
+    }
+    function logMeal(mealN, when) {
       const id = uid();
-      const mealN = todaysFeeds().length + 1;
       const food = "Meal " + mealN;
-      S.feeds.push({ id, ts: new Date().toISOString(), food, mealN });
+      S.feeds.push({ id, ts: when.toISOString(), food, mealN });
+      const nxt = nextMealTime();
+      let extra = "Potty in 10–15 min.";
+      if (nxt) extra += " Next bowl " + fmtTime(nxt) + ".";
+      flash = { text: `Logged ${food} · ${fmtTime(when)}. ${extra}`, undo: { kind: "feed", id } };
+      save(S); render();
+    }
+    document.querySelectorAll("[data-fed]").forEach(b => b.onclick = () => {
+      const when = new Date();
+      const mealN = inferMealN(when);
+      const id = uid();
+      const food = "Meal " + mealN;
+      S.feeds.push({ id, ts: when.toISOString(), food, mealN });
       const nxt = nextMealTime();
       let extra = "Potty in 10–15 min.";
       if (nxt) {
@@ -1262,6 +1318,12 @@
       flash = { text: `Logged ${food} · ${fmtTime(new Date())}. ${extra}`, undo: { kind: "feed", id } };
       save(S); render();
     });
+    const addMissed = document.getElementById("addMissed");
+    if (addMissed) addMissed.onclick = () => {
+      const hm = (document.getElementById("missedTime") || {}).value || "07:30";
+      const n = Number((document.getElementById("missedN") || {}).value) || inferMealN(stampToday(hm));
+      logMeal(n, stampToday(hm));
+    };
     document.querySelectorAll("[data-potty]").forEach(b => b.onclick = () => {
       const id = uid();
       const [where, kind] = b.dataset.potty.split("-");
