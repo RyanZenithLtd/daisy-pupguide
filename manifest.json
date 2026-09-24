@@ -1,0 +1,9 @@
+{
+  "name": "PupGuide — Puppy Trainer",
+  "short_name": "PupGuide",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F4EDE3",
+  "theme_color": "#3D2A1F",
+  "description": "Local puppy training companion for an 8-week-old puppy."
+}
