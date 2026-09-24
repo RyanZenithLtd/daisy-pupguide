@@ -734,43 +734,22 @@
         </div>
         <p class="tiny">${fedN}/${mealGoal} meals logged today · ${S.puppy.weightKg} kg</p>
         <p class="tiny">${changeLine}</p>
-        <p class="tiny">${S.notify ? "Reminders on · keep this tab open" : "Reminders off · turn on in More or tap below"}</p>
         <div class="row" style="margin-top:8px">
           <button class="btn sage" data-fed="yes">I FED DAISY</button>
           <button class="btn sm ghost" data-goto="feed">Feeding plan</button>
-          <button class="btn sm ghost" id="toggleNotifyHome">${S.notify ? "Reminders on" : "Enable reminders"}</button>
         </div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn sm sage" id="cloudSaveHome">Sync now</button>
-        </div>
-        <p class="tiny">${S.syncCode ? "Auto-sync on · " + (S.lastCloud ? "last " + escapeHtml(S.lastCloud) : "waiting for first save") : "Set a sync code once in More → Cloud save"}</p>
         ${toastHTML()}
       </div>
       ${napCardHTML(w)}
       <div class="card">
-        <div class="next">
-          <div>
-            <h2 style="margin:0">Next potty</h2>
-            <p class="muted" style="margin:4px 0 0">${(() => {
-              const np = nextPottyTrip(w);
-              if (!np) return due;
-              const m = minsUntil(np.t);
-              if (m <= 0) return np.label + " — take her now";
-              return np.label + (m < 60 ? ` · in ${m} min` : ` · ${fmtTime(np.t)}`);
-            })()}</p>
-          </div>
-          <div class="timer">${(nextPottyTrip(w) && fmtTime(nextPottyTrip(w).t)) || "—"}</div>
-        </div>
+        <h2>Potty, then the loop</h2>
+        <p class="muted">No timed wee-alarms. Take her out after wake, meals, play and when a nap ends. Log it on the Potty tab.</p>
         <div class="loop">
           <div class="now">Potty</div>
           <div>Play / train 5 min</div>
           <div>Calm chew</div>
           <div>Nap ${crateMins(w)} min</div>
         </div>
-        ${pottySchedule(w).filter(tr => tr.t.getTime() >= Date.now() - 10*60000).slice(0,5).map(tr => `
-          <div class="log-item"><div>${tr.hm} · ${tr.label}</div></div>
-        `).join("")}
-        <p class="tiny" style="margin:10px 0 0">Wake is ${S.puppy.wake}. At ${w} weeks go out every ${holdMins(w)} min while she is awake, plus after every nap and meal. Full list is on the Potty tab.</p>
       </div>
       <div class="statgrid">
         <div class="stat"><b>${success}</b><span>successful potties today</span></div>
@@ -795,6 +774,21 @@
         </ul>
       </div>
       <div class="banner">If she is land-sharking, she is usually tired, not “dominant”. Put her down for a nap.</div>
+      <div class="card">
+        <h2>Reminders &amp; sync</h2>
+        <div class="toast ${S.notify ? "" : "warn"}" style="margin-top:4px">
+          <span>${S.notify ? "REMINDERS ARE ON" : "REMINDERS ARE OFF"}</span>
+        </div>
+        <p class="muted">${S.notify ? "Pings for meal times and nap check-ins only. Keep this tab open." : "No pings. Turn them on if you want meal and nap alerts."}</p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn ${S.notify?"ghost":""}" id="toggleNotifyHome">${S.notify ? "Turn reminders OFF" : "Turn reminders ON"}</button>
+          <button class="btn ghost sm" id="testNotify">Test banner</button>
+        </div>
+        <p class="tiny" style="margin-top:12px">${S.syncCode ? "Cloud save on · " + (S.lastCloud ? "last " + escapeHtml(S.lastCloud) : "waiting for first save") : "Set a sync code once in More → Cloud save"}</p>
+        <div class="row">
+          <button class="btn sm sage" id="cloudSaveHome">Sync now</button>
+        </div>
+      </div>
     `;
   }
 
@@ -892,7 +886,7 @@
     return `
       <div class="card">
         <h2>Log a potty</h2>
-        <p class="muted">Wake ${S.puppy.wake}. At ${w} weeks: every ${holdMins(w)} minutes while awake, and after sleep, food and play. Carry her so the hallway stays dry.</p>
+        <p class="muted">No clockwork wee list. Take her out after sleep, food and play, and if she sniffs or circles. Carry her so the hallway stays dry.</p>
         <div class="row" style="margin-top:10px">
           <button class="btn" data-potty="out-wee">✓ Wee outside</button>
           <button class="btn sage" data-potty="out-poo">✓ Poo outside</button>
@@ -905,21 +899,6 @@
         ${today.length ? `<p class="muted" style="margin:12px 0 0">Today: ${rate}% outside (${today.filter(p=>p.where==="out").length}/${today.length}). Two accidents in a day? Shorten the interval tomorrow.</p>` : ""}
       </div>
       ${napCardHTML(w)}
-      <div class="card">
-        <h2>Today’s potty times</h2>
-        <p class="muted">Built from a ${S.puppy.wake} wake-up, her meal times, and a ${holdMins(w)}-minute awake gap. Still take her out if she sniffs, circles or suddenly stops play — the clock is a net, not a cage.</p>
-        ${pottySchedule(w).map(tr => {
-          const m = minsUntil(tr.t);
-          const state = m < -20 ? "done" : m <= 5 ? "now" : "soon";
-          return `<div class="log-item">
-            <div>
-              <b class="${state==="now"?"ok":""}">${tr.hm}</b>
-              <div class="tiny">${tr.label}${state==="now"?" · now":state==="done"?" · passed":""}</div>
-            </div>
-            <div class="muted">${state==="done"?"—": m <= 0 ? "now" : m + " min"}</div>
-          </div>`;
-        }).join("")}
-      </div>
       <div class="card">
         <h2>How to teach it</h2>
         <ol class="clean">
@@ -1115,8 +1094,8 @@
       }
       S.notify = true;
       flash = granted
-        ? { text: "Reminders are ON. Keep this tab open. Next potty, nap and meal will ping." }
-        : { text: "Reminders are ON in the app. Chrome blocked a lock-screen banner from this file — you will still see the green strip here.", tone: "warn" };
+        ? { text: "Reminders are ON. Meals and nap check-ins only. Keep this tab open." }
+        : { text: "Reminders are ON in the app (meals + nap). Chrome may still block a lock-screen banner.", tone: "warn" };
       save(S); render();
     }
     const box = document.getElementById("syncCode");
@@ -1169,7 +1148,7 @@
     if (toggleNotifyHome) toggleNotifyHome.onclick = enableReminders;
     const testNotify = document.getElementById("testNotify");
     if (testNotify) testNotify.onclick = () => {
-      pingNotify("Daisy — test banner", "This is the reminder style for potty, naps and meals.");
+      pingNotify("Daisy — test banner", "This is the reminder style for meals and nap check-ins.");
       const locked = !("Notification" in window) || Notification.permission !== "granted";
       flash = {
         text: locked
@@ -1411,8 +1390,6 @@
     window._pgTimers = [];
     if (!S.notify || !S.onboarded) return;
     const w = weeksOld(S.puppy.dob);
-    const pot = nextPottyTrip(w);
-    if (pot && pot.t) armNotify(pot.t, "Daisy — potty", pot.label || "Time to go outside");
     const meal = nextMealTime();
     if (meal) armNotify(meal, "Daisy — meal", "Food time, then potty 10–15 minutes after");
     const nap = activeNap();
