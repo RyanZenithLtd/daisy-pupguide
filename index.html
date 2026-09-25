@@ -68,6 +68,7 @@
     .btn.sky { background: var(--sky); }
     .btn.block { width: 100%; }
     .btn.sm { padding: 8px 10px; font-size: 13px; font-weight: 600; }
+    .btn:disabled { opacity: 0.45; transform: none; pointer-events: none; }
     .field { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; margin: 6px 0 10px; }
     .chip {
       border: 1px solid var(--line); background: #fff; border-radius: 999px;
@@ -227,6 +228,19 @@
     ]}
   ];
 
+  const GOLDEN = [
+    { title: "Name game", note: "Soft name → look → treat. Never use Daisy to scold.", url: "https://www.youtube.com/watch?v=wqoYc4VZCOg", who: "Kikopup" },
+    { title: "Stop puppy biting", note: "Goldens mouth. Freeze, swap to a toy, nap if she revs up.", url: "https://www.youtube.com/watch?v=c77--cCHPyU", who: "Kikopup" },
+    { title: "Handling games", note: "Paws, ears, mouth — a retriever will be groomed a lot.", url: "https://www.youtube.com/watch?v=3dMKR5i9iNQ", who: "Kikopup" },
+    { title: "Come when called", note: "Party voice. Two-person ping-pong in the house first.", url: "https://www.youtube.com/watch?v=rjd99MlmqqI", who: "Kikopup" },
+    { title: "Capturing calm", note: "Pay her for doing nothing. Goldens get giddy.", url: "https://www.youtube.com/watch?v=wesm2OpE_2c", who: "Kikopup" },
+    { title: "Crate as a den", note: "Door open, meals inside, short closes.", url: "https://www.youtube.com/watch?v=dUzF0g0PwY4", who: "Kikopup" },
+    { title: "Loose leash", note: "Start indoors. She will pull like a train later.", url: "https://www.youtube.com/watch?v=sFgtqgiAKoQ", who: "Kikopup" },
+    { title: "Leash biting", note: "Common in retriever pups. Teach calm around the lead.", url: "https://www.youtube.com/watch?v=IR7TvrUQ_1k", who: "Kikopup" },
+    { title: "Chin rest", note: "Vet and grooming hold. Goldens need coat and ear care.", url: "https://www.youtube.com/watch?v=wHRhiwqrYRg", who: "Kikopup" },
+    { title: "9-week session", note: "What a whole short session looks like.", url: "https://www.youtube.com/watch?v=BTEKQkAPB9M", who: "Kikopup" }
+  ];
+
   const DEFAULT = {
     v: 2,
     puppy: {
@@ -256,7 +270,8 @@
     syncCode: "",
     lastCloud: "",
     updatedAt: 0,
-    ntfyTopic: ""
+    ntfyTopic: "",
+    whoAmI: ""
   };
 
   const $ = (sel, el=document) => el.querySelector(sel);
@@ -282,6 +297,7 @@
     if (!s.lastCloud) s.lastCloud = "";
     if (!s.updatedAt) s.updatedAt = Date.now();
     if (!s.ntfyTopic) s.ntfyTopic = "";
+    if (!s.whoAmI) s.whoAmI = "";
     if (!Array.isArray(s.weights) || !s.weights.length) s.weights = [{ kg: s.puppy.weightKg, note: "starting weight" }];
     if (!s.puppy.dropTo3 || !s.puppy.dropTo2) {
       const plan = defaultMealPlan(s.puppy.dob);
@@ -485,6 +501,18 @@
   function todaysFeeds() {
     const k = todayKey();
     return S.feeds.filter(f => todayKey(new Date(f.ts)) === k);
+  }
+  function lastFeed() {
+    const list = todaysFeeds();
+    if (!list.length) return null;
+    return list.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
+  }
+  function feedLockMins() {
+    const last = lastFeed();
+    if (!last) return 0;
+    const elapsed = (Date.now() - new Date(last.ts).getTime()) / 60000;
+    if (elapsed >= 90) return 0;
+    return Math.max(1, Math.ceil(90 - elapsed));
   }
   function addMins(d, n) {
     const x = new Date(d.getTime());
@@ -758,8 +786,9 @@
         </div>
         <p class="tiny">${fedN}/${mealGoal} meals logged today · ${S.puppy.weightKg} kg</p>
         <div class="row" style="margin-top:8px">
-          <button class="btn sage" data-fed="yes">I FED DAISY</button>
+          ${feedLockMins() ? `<button class="btn sage" disabled>I FED DAISY · wait ${feedLockMins()} min</button>` : `<button class="btn sage" data-fed="yes">I FED DAISY</button>`}
         </div>
+        ${feedLockMins() ? `<p class="tiny">Last bowl ${fmtTime(new Date(lastFeed().ts))}${lastFeed().by ? " · " + escapeHtml(lastFeed().by) : ""}. Button unlocks so you don’t double-feed.</p>` : ""}
         ${toastHTML()}
       </div>
       <div class="card">
@@ -847,8 +876,9 @@
         <div class="timer" style="margin:6px 0">${nxt ? fmtTime(nxt) : "—"}</div>
         <p class="muted">${!nxt ? "Set meal times below." : leftM <= 0 ? "Due now. Then potty 10–15 minutes after she finishes." : `Next meal in ${leftM} min.`}</p>
         <div class="row" style="margin-top:8px">
-          <button class="btn sage" data-fed="yes">I FED DAISY</button>
+          ${feedLockMins() ? `<button class="btn sage" disabled>I FED DAISY · wait ${feedLockMins()} min</button>` : `<button class="btn sage" data-fed="yes">I FED DAISY</button>`}
         </div>
+        ${feedLockMins() ? `<p class="tiny">Locked after the last bowl so two people don’t feed twice.</p>` : ""}
         ${toastHTML()}
         <p class="tiny" style="margin-top:12px">Add a meal you already gave, at the time it happened.</p>
         <div class="row">
@@ -914,7 +944,7 @@
         <p class="tiny">Today’s target: ${stage.count} bowls · 4-meal phase ends ${prettyDay(S.puppy.dropTo3)} · 3-meal phase ends ${prettyDay(S.puppy.dropTo2)}</p>
         ${logs.length ? logs.map(f => `
           <div class="log-item">
-            <div><b>${escapeHtml(f.food || (f.mealN ? "Meal " + f.mealN : "Meal"))}</b></div>
+            <div><b>${escapeHtml(f.food || (f.mealN ? "Meal " + f.mealN : "Meal"))}</b>${f.by ? `<div class="tiny">by ${escapeHtml(f.by)}</div>` : ""}</div>
             <div class="right">
               <span class="muted">${friendlyTs(f.ts)}</span>
               <button class="btn undo" data-del-feed="${f.id || f.ts}">Remove</button>
@@ -997,6 +1027,31 @@
         </div>
       `).join("")}
       <div class="card">
+        <h2>Golden Retriever topics</h2>
+        <p class="muted">Daisy will grow into a soft-mouthed, people-loving, coat-heavy dog. Train the adult you want now. Videos are Kikopup (force-free). Opens YouTube.</p>
+        <ul class="clean">
+          <li><b>Mouthing.</b> Retriever pups use their mouths. Hands freeze, toy appears, session ends if she is tired.</li>
+          <li><b>Recall.</b> Two people, hallway first. Never call her to end play or clip nails.</li>
+          <li><b>Grooming.</b> Daily 20-second brush + treat. Ears and paws before the first clip.</li>
+          <li><b>Water.</b> Wait for vaccines. Shallow puddle, choice to step in, no throwing her in.</li>
+          <li><b>Retrieve.</b> Two-toy swap. She brings one, you show the other. No tug-of-war over every sock.</li>
+          <li><b>Joints.</b> Short play on grass. No hours of fetch, no stairs for fun, no jumping in and out of the car.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Watch with Daisy nearby</h2>
+        ${GOLDEN.map(v => `
+          <div class="log-item">
+            <div>
+              <b>${v.title}</b>
+              <div class="tiny">${v.who} · ${v.note}</div>
+            </div>
+            <a class="btn ghost sm" href="${v.url}" target="_blank" rel="noopener">Watch</a>
+          </div>
+        `).join("")}
+        <p class="tiny" style="margin-top:8px">Full Kikopup puppy playlist: <a href="https://www.youtube.com/playlist?list=PLF26FD559887E7EA4" target="_blank" rel="noopener">open playlist</a></p>
+      </div>
+      <div class="card">
         <h2>Session rules</h2>
         <ul class="clean">
           <li>1–3 minutes. Stop while she still wants more.</li>
@@ -1061,9 +1116,13 @@
           <button class="btn ${S.notify?"ghost":""}" id="toggleNotify">${S.notify ? "Turn reminders OFF" : "Turn reminders ON"}</button>
           <button class="btn ghost sm" id="testNotify">Test banner</button>
         </div>
+        <h3 style="margin-top:16px">This phone</h3>
+        <p class="muted">Name used when you tap I FED DAISY, so your partner’s notification says who fed her. This stays on this phone only.</p>
+        <input class="field" id="whoAmI" value="${escapeHtml((() => { try { return localStorage.getItem("pg-who") || S.whoAmI || ""; } catch (e) { return S.whoAmI || ""; } })())}" placeholder="e.g. Sam" />
+        <button class="btn ghost sm" id="saveWho" style="margin-top:8px">Save my name</button>
         <h3 style="margin-top:16px">ntfy lock-screen alarms</h3>
-        <p class="muted">If the ntfy app is subscribed to this topic, PupGuide can ask ntfy’s servers to buzz you later — Chrome can be closed.</p>
-        <label class="tiny">ntfy topic (same as in the ntfy app)</label>
+        <p class="muted">Both phones install the free ntfy app and subscribe to the <b>same</b> topic. Then I FED DAISY pings the other person even if Chrome is closed.</p>
+        <label class="tiny">ntfy topic (same on both phones)</label>
         <input class="field" id="ntfyTopic" value="${escapeHtml(S.ntfyTopic || "")}" placeholder="daisy-k7m2qx91" autocomplete="off" />
         <div class="row">
           <button class="btn ghost sm" id="ntfySave">Save topic</button>
@@ -1282,41 +1341,51 @@
     };
     document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => { tab = b.dataset.goto; render(); });
     document.querySelectorAll("[data-open-skill]").forEach(b => b.onclick = () => { tab = "train"; render(); });
+    function feederName() {
+      try { return (localStorage.getItem("pg-who") || S.whoAmI || "").trim(); } catch (e) { return (S.whoAmI || "").trim(); }
+    }
+    const saveWho = document.getElementById("saveWho");
+    if (saveWho) saveWho.onclick = () => {
+      const v = ((document.getElementById("whoAmI") || {}).value || "").trim();
+      try { localStorage.setItem("pg-who", v); } catch (e) {}
+      S.whoAmI = v;
+      flash = { text: v ? "This phone is " + v + "." : "Name cleared." };
+      save(S); render();
+    };
     function stampToday(hm) {
       const d = parseHM(hm || "07:30");
       if (d.getTime() > Date.now() + 2 * 60000) d.setDate(d.getDate() - 1);
       return d;
     }
-    function logMeal(mealN, when) {
+    function logMeal(mealN, when, opts) {
       const id = uid();
       const food = "Meal " + mealN;
-      S.feeds.push({ id, ts: when.toISOString(), food, mealN });
+      const by = feederName();
+      S.feeds.push({ id, ts: when.toISOString(), food, mealN, by });
       const nxt = nextMealTime();
       let extra = "Potty in 10–15 min.";
       if (nxt) extra += " Next bowl " + fmtTime(nxt) + ".";
-      flash = { text: `Logged ${food} · ${fmtTime(when)}. ${extra}`, undo: { kind: "feed", id } };
-      save(S); render();
+      const byBit = by ? " by " + by : "";
+      ntfySend("Daisy has been fed", food + " at " + fmtTime(when) + byBit + ". Don’t give another bowl.");
+      if (opts && opts.live) {
+        if (nxt) {
+          const wait = Math.max(1, minsUntil(nxt));
+          if (wait >= 1 && wait <= 3 * 24 * 60) {
+            ntfySend("Daisy — meal " + (mealN + 1), "Time for the next bowl, then potty 10–15 min after.", {
+              Delay: String(Math.floor(nxt.getTime() / 1000))
+            });
+          }
+        }
+        ntfySend("Daisy — potty after meal", "Carry her outside. She just ate.", { In: "12m" });
+      }
+      flash = { text: `Logged ${food} · ${fmtTime(when)}${byBit}. Partner ping sent. ${extra}`, undo: { kind: "feed", id } };
+      save(S);
+      pushCloud(true);
+      render();
     }
     document.querySelectorAll("[data-fed]").forEach(b => b.onclick = () => {
       const when = new Date();
-      const mealN = inferMealN(when);
-      const id = uid();
-      const food = "Meal " + mealN;
-      S.feeds.push({ id, ts: when.toISOString(), food, mealN });
-      const nxt = nextMealTime();
-      let extra = "Potty in 10–15 min.";
-      if (nxt) {
-        const wait = Math.max(1, minsUntil(nxt));
-        extra += " Next bowl " + fmtTime(nxt) + ".";
-        if (wait >= 1 && wait <= 3 * 24 * 60) {
-          ntfySend("Daisy — meal " + (mealN + 1), "Time for the next bowl, then potty 10–15 min after.", {
-            Delay: String(Math.floor(nxt.getTime() / 1000))
-          });
-        }
-      }
-      ntfySend("Daisy — potty after meal", "Carry her outside. She just ate.", { In: "12m" });
-      flash = { text: `Logged ${food} · ${fmtTime(new Date())}. ${extra}`, undo: { kind: "feed", id } };
-      save(S); render();
+      logMeal(inferMealN(when), when, { live: true });
     });
     const addMissed = document.getElementById("addMissed");
     if (addMissed) addMissed.onclick = () => {
