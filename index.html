@@ -271,7 +271,8 @@
     lastCloud: "",
     updatedAt: 0,
     ntfyTopic: "",
-    whoAmI: ""
+    whoAmI: "",
+    baths: []
   };
 
   const $ = (sel, el=document) => el.querySelector(sel);
@@ -301,6 +302,7 @@
     if (!s.updatedAt) s.updatedAt = Date.now();
     if (!s.ntfyTopic) s.ntfyTopic = "";
     if (!s.whoAmI) s.whoAmI = "";
+    if (!Array.isArray(s.baths)) s.baths = [];
     if (!Array.isArray(s.weights) || !s.weights.length) s.weights = [{ kg: s.puppy.weightKg, note: "starting weight" }];
     if (!s.puppy.dropTo3 || !s.puppy.dropTo2) {
       const plan = defaultMealPlan(s.puppy.dob);
@@ -517,6 +519,41 @@
     const list = todaysFeeds();
     if (!list.length) return null;
     return list.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
+  }
+  function lastBath() {
+    if (!S.baths || !S.baths.length) return null;
+    return S.baths.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
+  }
+  function bathGapDays(weeks) {
+    if (weeks <= 12) return 49;
+    if (weeks <= 16) return 42;
+    if (weeks <= 26) return 35;
+    return 28;
+  }
+  function nextBathDate() {
+    const w = weeksOld(S.puppy.dob);
+    const gap = bathGapDays(w);
+    const last = lastBath();
+    const start = last ? new Date(last.ts) : new Date();
+    const next = new Date(start.getTime());
+    next.setDate(next.getDate() + (last ? gap : (w <= 10 ? 14 : 0)));
+    next.setHours(12, 0, 0, 0);
+    return next;
+  }
+  function bathPlan() {
+    const out = [];
+    let cursor = nextBathDate();
+    const end = new Date();
+    end.setMonth(end.getMonth() + 12);
+    let w = weeksOld(S.puppy.dob);
+    for (let i = 0; i < 16 && cursor <= end; i++) {
+      const ageThen = w + Math.floor((cursor - Date.now()) / (7 * 24 * 3600 * 1000));
+      const gap = bathGapDays(Math.max(8, ageThen));
+      out.push({ d: new Date(cursor), gap, age: Math.max(8, ageThen) });
+      cursor = new Date(cursor.getTime());
+      cursor.setDate(cursor.getDate() + gap);
+    }
+    return out;
   }
   function feedLockMins() {
     const last = lastFeed();
@@ -848,6 +885,7 @@
           <li>18–20 hours of sleep including naps.</li>
           <li>One new, calm socialisation experience — quality, not a crowd.</li>
           <li>30 seconds of handling: paws, ears, mouth.</li>
+          <li>Bath: only when dirty. Next suggested ${prettyDay(ymd(nextBathDate()))} · log it in More.</li>
         </ul>
       </div>
       <div class="banner">If she is land-sharking, she is usually tired, not “dominant”. Put her down for a nap.</div>
@@ -1118,6 +1156,36 @@
         </div>
       </div>
       <div class="card">
+        <h2>Baths</h2>
+        ${toastHTML()}
+        <p class="muted">Golden coats need oil. An 8-week-old should not be washed every week. Towel and brush first. Full bath only if she is smelly, muddy to the skin, or rolled in something foul.</p>
+        <p class="tiny">Gap now: about every ${bathGapDays(w)} days. Next bath ${prettyDay(ymd(nextBathDate()))}${lastBath() ? " · last " + friendlyTs(lastBath().ts) : " · none logged yet"}.</p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sage" id="logBath">We bathed Daisy</button>
+        </div>
+        <h3 style="margin-top:14px">Suggested dates</h3>
+        <p class="tiny">Built from today (or the last logged bath) through the next year. Gaps tighten a little as she gets bigger and muddier — still not a weekly wash.</p>
+        ${bathPlan().map(p => `
+          <div class="log-item">
+            <div>
+              <b>${prettyDay(ymd(p.d))}</b>
+              <div class="tiny">~${p.age} weeks · then wait ${p.gap} days</div>
+            </div>
+          </div>
+        `).join("")}
+        <p class="tiny">Puppy shampoo only, lukewarm water, rinse well, dry the ears and the thick ruff. Skip human shampoo and high-pressure hoses.</p>
+        <h3 style="margin-top:14px">Log</h3>
+        ${(S.baths || []).length ? [...S.baths].reverse().slice(0, 12).map(b => `
+          <div class="log-item">
+            <div>Bath${b.by ? " · " + escapeHtml(b.by) : ""}</div>
+            <div class="right">
+              <span class="muted">${friendlyTs(b.ts)}</span>
+              <button class="btn undo" data-del-bath="${b.id || b.ts}">Remove</button>
+            </div>
+          </div>
+        `).join("") : `<div class="empty">No baths logged.</div>`}
+      </div>
+      <div class="card">
         <h2>House code</h2>
         ${toastHTML()}
         <p class="muted">One code does cloud save <b>and</b> lock-screen pings. Put it on both phones. In the ntfy app, subscribe to this exact name.</p>
@@ -1361,6 +1429,24 @@
       flash = { text: v ? "This phone is " + v + "." : "Name cleared." };
       save(S); render();
     };
+    const logBath = document.getElementById("logBath");
+    if (logBath) logBath.onclick = () => {
+      const id = uid();
+      S.baths = S.baths || [];
+      S.baths.push({ id, ts: new Date().toISOString(), by: feederName() });
+      const next = nextBathDate();
+      flash = { text: "Bath logged. Next wash around " + prettyDay(ymd(next)) + ". Brush and towel until then." };
+      ntfySend("Daisy had a bath", "Logged " + fmtTime(new Date()) + (feederName() ? " by " + feederName() : "") + ". Next bath ~" + prettyDay(ymd(next)) + ".");
+      save(S);
+      pushCloud(true);
+      render();
+    };
+    document.querySelectorAll("[data-del-bath]").forEach(b => b.onclick = () => {
+      const key = b.dataset.delBath;
+      S.baths = (S.baths || []).filter(x => (x.id || x.ts) !== key);
+      flash = { text: "Bath removed from the log.", tone: "warn" };
+      save(S); render();
+    });
     function stampToday(hm) {
       const d = parseHM(hm || "07:30");
       if (d.getTime() > Date.now() + 2 * 60000) d.setDate(d.getDate() - 1);
