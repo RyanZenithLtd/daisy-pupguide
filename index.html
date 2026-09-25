@@ -294,6 +294,9 @@
     if (typeof s.notify !== "boolean") s.notify = false;
     if (!s.cloudUrl) s.cloudUrl = DEFAULT.cloudUrl;
     if (!s.syncCode) s.syncCode = "";
+    if (!s.ntfyTopic && s.syncCode) s.ntfyTopic = s.syncCode;
+    if (!s.syncCode && s.ntfyTopic) s.syncCode = s.ntfyTopic;
+    if (s.syncCode && s.ntfyTopic && s.syncCode !== s.ntfyTopic) s.ntfyTopic = s.syncCode;
     if (!s.lastCloud) s.lastCloud = "";
     if (!s.updatedAt) s.updatedAt = Date.now();
     if (!s.ntfyTopic) s.ntfyTopic = "";
@@ -322,6 +325,14 @@
   function queueCloudSync() {
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => { syncCloud(); }, 800);
+  }
+  function houseCode() {
+    return (S.syncCode || S.ntfyTopic || "").trim();
+  }
+  function setHouseCode(v) {
+    v = String(v || "").trim();
+    S.syncCode = v;
+    S.ntfyTopic = v;
   }
   function cloudUrlFor(code) {
     const base = (S.cloudUrl || DEFAULT.cloudUrl).replace(/\/$/, "");
@@ -841,18 +852,20 @@
       </div>
       <div class="banner">If she is land-sharking, she is usually tired, not “dominant”. Put her down for a nap.</div>
       <div class="card">
-        <h2>Reminders &amp; sync</h2>
-        <div class="toast ${S.notify ? "" : "warn"}" style="margin-top:4px">
-          <span>${S.notify ? "REMINDERS ARE ON" : "REMINDERS ARE OFF"}</span>
-        </div>
-        <p class="muted">${S.notify ? "Pings for meal times and nap check-ins only. Keep this tab open." : "No pings. Turn them on if you want meal and nap alerts."}</p>
+        <h2>House code</h2>
+        <p class="muted">One code for cloud save and partner pings. Same on both phones. Subscribe to this name in the ntfy app.</p>
+        <input class="field" id="houseCode" value="${escapeHtml(houseCode())}" placeholder="daisy-k7m2qx91" autocomplete="off" />
+        <p class="tiny">${houseCode() ? (S.lastCloud ? "Last sync " + escapeHtml(S.lastCloud) : "Code set · tap Sync now") : "Enter a code (8+ characters)."}</p>
         <div class="row" style="margin-top:8px">
-          <button class="btn ${S.notify?"ghost":""}" id="toggleNotifyHome">${S.notify ? "Turn reminders OFF" : "Turn reminders ON"}</button>
-          <button class="btn ghost sm" id="testNotify">Test banner</button>
-        </div>
-        <p class="tiny" style="margin-top:12px">${S.syncCode ? "Cloud save on · " + (S.lastCloud ? "last " + escapeHtml(S.lastCloud) : "waiting for first save") : "Set a sync code once in More → Cloud save"}</p>
-        <div class="row">
+          <button class="btn sage sm" id="saveHouseHome">Save code</button>
           <button class="btn sm sage" id="cloudSaveHome">Sync now</button>
+          <button class="btn ghost sm" id="ntfyTest">Test ping</button>
+        </div>
+        <div class="toast ${S.notify ? "" : "warn"}" style="margin-top:12px">
+          <span>${S.notify ? "ON-SCREEN REMINDERS ON" : "ON-SCREEN REMINDERS OFF"}</span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn ${S.notify?"ghost":""} sm" id="toggleNotifyHome">${S.notify ? "Turn screen reminders OFF" : "Turn screen reminders ON"}</button>
         </div>
       </div>
     `;
@@ -1105,29 +1118,25 @@
         </div>
       </div>
       <div class="card">
-        <h2>Reminders</h2>
+        <h2>House code</h2>
         ${toastHTML()}
-        <div class="toast ${S.notify ? "" : "warn"}" style="margin-top:8px">
-          <span>${S.notify ? "REMINDERS ARE ON" : "REMINDERS ARE OFF"}</span>
-        </div>
-        <p class="muted">${S.notify ? "While this page stays open, the next potty, nap check and meal can ping. Lock the phone if you like — don’t swipe Chrome away." : "No pings. Tap the button below to switch them on."}</p>
-        <p class="tiny">A file in Downloads cannot alarm you after Chrome is closed. Use the Clock app for the night wee if you need a lock-screen alarm.</p>
+        <p class="muted">One code does cloud save <b>and</b> lock-screen pings. Put it on both phones. In the ntfy app, subscribe to this exact name.</p>
+        <label class="tiny">Shared code (8+ characters)</label>
+        <input class="field" id="houseCode" value="${escapeHtml(houseCode())}" placeholder="daisy-k7m2qx91" autocomplete="off" />
+        <p class="tiny">${S.lastCloud ? "Last cloud save: " + escapeHtml(S.lastCloud) : "Nothing saved from this phone yet."}</p>
         <div class="row" style="margin-top:8px">
-          <button class="btn ${S.notify?"ghost":""}" id="toggleNotify">${S.notify ? "Turn reminders OFF" : "Turn reminders ON"}</button>
-          <button class="btn ghost sm" id="testNotify">Test banner</button>
+          <button class="btn sage" id="saveHouse">Save code</button>
+          <button class="btn sage" id="cloudSave">Sync now</button>
+          <button class="btn ghost" id="cloudLoad">Force load</button>
         </div>
-        <h3 style="margin-top:16px">This phone</h3>
-        <p class="muted">Name used when you tap I FED DAISY, so your partner’s notification says who fed her. This stays on this phone only.</p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn ghost sm" id="ntfyTest">Test partner ping</button>
+          <button class="btn ${S.notify?"ghost":""} sm" id="toggleNotify">${S.notify ? "Screen reminders OFF" : "Screen reminders ON"}</button>
+        </div>
+        <h3 style="margin-top:16px">This phone’s name</h3>
+        <p class="muted">Stays on this handset. Shows in “Daisy has been fed by …”.</p>
         <input class="field" id="whoAmI" value="${escapeHtml((() => { try { return localStorage.getItem("pg-who") || S.whoAmI || ""; } catch (e) { return S.whoAmI || ""; } })())}" placeholder="e.g. Sam" />
         <button class="btn ghost sm" id="saveWho" style="margin-top:8px">Save my name</button>
-        <h3 style="margin-top:16px">ntfy lock-screen alarms</h3>
-        <p class="muted">Both phones install the free ntfy app and subscribe to the <b>same</b> topic. Then I FED DAISY pings the other person even if Chrome is closed.</p>
-        <label class="tiny">ntfy topic (same on both phones)</label>
-        <input class="field" id="ntfyTopic" value="${escapeHtml(S.ntfyTopic || "")}" placeholder="daisy-k7m2qx91" autocomplete="off" />
-        <div class="row">
-          <button class="btn ghost sm" id="ntfySave">Save topic</button>
-          <button class="btn sage" id="ntfyTest">Test ntfy</button>
-        </div>
       </div>
       <div class="card">
         <h2>Week-by-week map</h2>
@@ -1160,18 +1169,6 @@
         <p class="muted">If you later want video lessons, Zigzag is built specifically for the first puppy year. Pupford has a useful free library. Dogo is strong on daily drills. This guide does not replace your vet.</p>
       </div>
       <div class="card">
-        <h2>Cloud save</h2>
-        ${toastHTML()}
-        <p class="muted">Same code on every phone. The app now keeps the newest copy: if this phone is behind, it loads; if it has newer logs, it saves. An older phone will not overwrite a newer one.</p>
-        <label class="tiny">Sync code (8+ characters)</label>
-        <input class="field" id="syncCode" value="${escapeHtml(S.syncCode || "")}" placeholder="daisy-k7m2qx91" autocomplete="off" />
-        <p class="tiny">${S.lastCloud ? "Last cloud save: " + escapeHtml(S.lastCloud) : "Nothing saved to the cloud from this phone yet."}</p>
-        <div class="row" style="margin-top:8px">
-          <button class="btn sage" id="cloudSave">Sync now</button>
-          <button class="btn ghost" id="cloudLoad">Force load from cloud</button>
-        </div>
-      </div>
-      <div class="card">
         <h2>Data</h2>
         <p class="tiny">This phone still keeps a local copy. Cloud save is the extra copy that other devices can load.</p>
         <button class="btn ghost sm" id="exportBtn">Copy log as text</button>
@@ -1202,20 +1199,34 @@
         : { text: "Reminders are ON in the app (meals + nap). Chrome may still block a lock-screen banner.", tone: "warn" };
       save(S); render();
     }
-    const box = document.getElementById("syncCode");
-    if (box) box.onchange = () => {
-      const v = box.value.trim();
-      if (v) { S.syncCode = v; save(S); }
-    };
+    function readHouseBox() {
+      const el = document.getElementById("houseCode") || document.getElementById("syncCode");
+      return el && el.value ? el.value.trim() : houseCode();
+    }
+    function saveHouseFromBox() {
+      const v = readHouseBox();
+      if (v) { setHouseCode(v); save(S); }
+      return v;
+    }
+    const box = document.getElementById("houseCode") || document.getElementById("syncCode");
+    if (box) box.onchange = () => saveHouseFromBox();
+    ["saveHouse", "saveHouseHome"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.onclick = () => {
+        const v = saveHouseFromBox();
+        flash = v
+          ? { text: "House code saved. Use this exact name in ntfy on both phones." }
+          : { text: "Type a code first (8+ letters or numbers).", tone: "warn" };
+        render();
+      };
+    });
     async function pushCloud(quiet) {
-      if (document.getElementById("syncCode") && document.getElementById("syncCode").value.trim()) {
-        S.syncCode = document.getElementById("syncCode").value.trim();
-        save(S, { dirty: false });
-      }
+      const v = readHouseBox();
+      if (v) { setHouseCode(v); save(S, { dirty: false }); }
       const r = await syncCloud();
       if (!quiet) {
-        flash = !S.syncCode
-          ? { text: "Set a sync code in More first.", tone: "warn" }
+        flash = !houseCode()
+          ? { text: "Set the house code first.", tone: "warn" }
           : r.action === "pull"
             ? { text: "This phone was behind. Loaded the newer cloud copy (naps included)." }
             : r.action === "push" || r.action === "upload-first"
@@ -1228,10 +1239,8 @@
       return r.ok;
     }
     async function pullCloud() {
-      if (document.getElementById("syncCode") && document.getElementById("syncCode").value.trim()) {
-        S.syncCode = document.getElementById("syncCode").value.trim();
-        save(S, { dirty: false });
-      }
+      const v = readHouseBox();
+      if (v) { setHouseCode(v); save(S, { dirty: false }); }
       const r = await syncCloud("pull");
       flash = r.ok
         ? { text: S.nap && !S.nap.end ? "Forced load. Nap timer is from the cloud." : "Forced load from cloud." }
@@ -1263,9 +1272,9 @@
       render();
     };
     async function ntfySend(title, body, extraHeaders) {
-      const topic = ((document.getElementById("ntfyTopic") || {}).value || S.ntfyTopic || "").trim();
+      const topic = readHouseBox() || houseCode();
       if (!/^[a-zA-Z0-9_-]{8,64}$/.test(topic)) return { ok: false, reason: "no-topic" };
-      S.ntfyTopic = topic;
+      setHouseCode(topic);
       save(S, { dirty: false });
       const ascii = s => String(s || "").replace(/[^\x20-\x7E]/g, "-");
       const headers = { Title: ascii(title), Priority: "high", Tags: "dog" };
