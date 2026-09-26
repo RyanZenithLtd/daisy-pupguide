@@ -69,6 +69,16 @@
     .btn.block { width: 100%; }
     .btn.sm { padding: 8px 10px; font-size: 13px; font-weight: 600; }
     .btn:disabled { opacity: 0.45; transform: none; pointer-events: none; }
+    .gallery { position: relative; }
+    .gallery img {
+      width: 100%; height: 210px; object-fit: cover; border-radius: 14px;
+      background: #E8D9C8; display: block;
+    }
+    .gallery .empty-shot {
+      height: 210px; border-radius: 14px; background: #E8D9C8;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 56px;
+    }
     .field { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; margin: 6px 0 10px; }
     .chip {
       border: 1px solid var(--line); background: #fff; border-radius: 999px;
@@ -316,6 +326,34 @@
     try { return migrate(JSON.parse(localStorage.getItem("pupguide") || "{}")); }
     catch { return structuredClone(DEFAULT); }
   }
+  function loadPhotos() {
+    try { return JSON.parse(localStorage.getItem("pg-photos") || "[]"); }
+    catch { return []; }
+  }
+  function savePhotos(list) {
+    localStorage.setItem("pg-photos", JSON.stringify(list));
+  }
+  function shrinkPic(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const max = 900;
+          let w = img.width, h = img.height;
+          if (w > max) { h = Math.round(h * max / w); w = max; }
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL("image/jpeg", 0.72));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
   function save(state, opts) {
     const dirty = !opts || opts.dirty !== false;
     if (dirty) state.updatedAt = Date.now();
@@ -326,7 +364,7 @@
   let syncing = false;
   function queueCloudSync() {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { syncCloud(); }, 800);
+    syncTimer = setTimeout(() => { syncCloud(); }, 300);
   }
   function houseCode() {
     return (S.syncCode || S.ntfyTopic || "").trim();
@@ -889,24 +927,25 @@
         </ul>
       </div>
       <div class="banner">If she is land-sharking, she is usually tired, not “dominant”. Put her down for a nap.</div>
-      <div class="card">
-        <h2>House code</h2>
-        <p class="muted">One code for cloud save and partner pings. Same on both phones. Subscribe to this name in the ntfy app.</p>
-        <input class="field" id="houseCode" value="${escapeHtml(houseCode())}" placeholder="daisy-k7m2qx91" autocomplete="off" />
-        <p class="tiny">${houseCode() ? (S.lastCloud ? "Last sync " + escapeHtml(S.lastCloud) : "Code set · tap Sync now") : "Enter a code (8+ characters)."}</p>
-        <div class="row" style="margin-top:8px">
-          <button class="btn sage sm" id="saveHouseHome">Save code</button>
-          <button class="btn sm sage" id="cloudSaveHome">Sync now</button>
-          <button class="btn ghost sm" id="ntfyTest">Test ping</button>
-        </div>
-        <div class="toast ${S.notify ? "" : "warn"}" style="margin-top:12px">
-          <span>${S.notify ? "ON-SCREEN REMINDERS ON" : "ON-SCREEN REMINDERS OFF"}</span>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn ${S.notify?"ghost":""} sm" id="toggleNotifyHome">${S.notify ? "Turn screen reminders OFF" : "Turn screen reminders ON"}</button>
-        </div>
-      </div>
+      ${galleryHTML()}
     `;
+  }
+
+  function galleryHTML() {
+    const pics = loadPhotos();
+    return `
+      <div class="card gallery">
+        <h2>${escapeHtml(S.puppy.name)}’s gallery</h2>
+        ${pics.length
+          ? `<img id="galImg" alt="${escapeHtml(S.puppy.name)}" src="${pics[0].src}" />`
+          : `<div class="empty-shot">🐾</div>`}
+        <p class="tiny" style="margin-top:8px">${pics.length ? pics.length + " photo" + (pics.length === 1 ? "" : "s") + " · rotates every few seconds" : "Add snaps of Daisy. They stay on this phone."}</p>
+        <div class="row">
+          <button class="btn sm sage" id="addPhotoBtn">Add photo</button>
+          ${pics.length ? `<button class="btn ghost sm" id="delPhotoBtn">Remove current</button>` : ""}
+        </div>
+        <input id="addPhoto" type="file" accept="image/*" capture="environment" hidden />
+      </div>`;
   }
 
   function feedHTML(w) {
@@ -963,7 +1002,7 @@
           <label class="field">Meal ${i+1}</label>
           <input type="time" data-meal-i="${i}" value="${t}" />
         `).join("")}
-        <button class="btn ghost sm" id="saveMeals" style="margin-top:10px">Save times</button>
+        <button class="btn sage sm" id="saveMeals" style="margin-top:10px">Save times &amp; sync</button>
       </div>
       <div class="card">
         <h2>What’s in the cupboard</h2>
@@ -1315,6 +1354,35 @@
         : { text: "Load failed. " + (r.reason || ""), tone: "warn" };
       render();
     }
+    const addPhotoBtn = document.getElementById("addPhotoBtn");
+    const addPhoto = document.getElementById("addPhoto");
+    if (addPhotoBtn && addPhoto) {
+      addPhotoBtn.onclick = () => addPhoto.click();
+      addPhoto.onchange = async () => {
+        const file = addPhoto.files && addPhoto.files[0];
+        if (!file) return;
+        try {
+          const src = await shrinkPic(file);
+          const pics = loadPhotos();
+          pics.push({ id: uid(), src });
+          savePhotos(pics);
+          flash = { text: "Photo added to Daisy’s gallery." };
+        } catch (e) {
+          flash = { text: "Could not add that photo.", tone: "warn" };
+        }
+        render();
+      };
+    }
+    const delPhotoBtn = document.getElementById("delPhotoBtn");
+    if (delPhotoBtn) delPhotoBtn.onclick = () => {
+      const pics = loadPhotos();
+      const img = document.getElementById("galImg");
+      const cur = img && img.getAttribute("src");
+      const next = cur ? pics.filter(p => p.src !== cur) : pics.slice(0, -1);
+      savePhotos(next);
+      flash = { text: "Photo removed." };
+      render();
+    };
     ["cloudSave", "cloudSaveHome"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.onclick = () => pushCloud(false);
@@ -1466,8 +1534,9 @@
         if (nxt) {
           const wait = Math.max(1, minsUntil(nxt));
           if (wait >= 1 && wait <= 3 * 24 * 60) {
-            ntfySend("Daisy — meal " + (mealN + 1), "Time for the next bowl, then potty 10–15 min after.", {
-              Delay: String(Math.floor(nxt.getTime() / 1000))
+            ntfySend("Daisy — next meal " + fmtTime(nxt), "Bowl at " + fmtTime(nxt) + ". Then potty 10–15 min after.", {
+              Delay: String(Math.floor(nxt.getTime() / 1000)),
+              Tags: "daisy-next-meal"
             });
           }
         }
@@ -1515,11 +1584,35 @@
       flash = { text: "Undone." };
       save(S); render();
     });
+    function grabMealTimes() {
+      const inputs = [...document.querySelectorAll("[data-meal-i]")];
+      if (!inputs.length) return S.puppy.mealTimes || [];
+      return inputs.map(i => i.value).filter(Boolean);
+    }
+    function pingScheduledMeals() {
+      const nxt = nextMealTime();
+      if (!nxt) return;
+      const wait = minsUntil(nxt);
+      if (wait < 1 || wait > 18 * 60) return;
+      ntfySend("Daisy — next meal " + fmtTime(nxt),
+        "Bowl at " + fmtTime(nxt) + " (" + (S.puppy.mealTimes || []).join(", ") + "). Ignore any older time such as 10:15pm.",
+        { Delay: String(Math.floor(nxt.getTime() / 1000)), Tags: "daisy-next-meal" });
+    }
     const saveMeals = document.getElementById("saveMeals");
     if (saveMeals) saveMeals.onclick = () => {
-      S.puppy.mealTimes = [...document.querySelectorAll("[data-meal-i]")].map(i => i.value);
-      save(S); alert("Meal times saved"); render();
+      S.puppy.mealTimes = grabMealTimes();
+      flash = { text: "Saved " + S.puppy.mealTimes.join(" · ") + " and sent to the other phone. Next alert " + (nextMealTime() ? fmtTime(nextMealTime()) : "—") + "." };
+      save(S);
+      pingScheduledMeals();
+      pushCloud(true);
+      render();
     };
+    document.querySelectorAll("[data-meal-i]").forEach(inp => {
+      inp.onchange = () => {
+        S.puppy.mealTimes = grabMealTimes();
+        save(S);
+      };
+    });
     const saveKg = document.getElementById("saveKg");
     if (saveKg) saveKg.onclick = () => {
       const kg = parseFloat(document.getElementById("newKg").value);
@@ -1538,13 +1631,21 @@
     if (apply3) apply3.onclick = () => {
       S.puppy.mealTimes = suggestedTimes(3);
       S.puppy.meals = 3;
-      save(S); render();
+      flash = { text: "Clock set to 3 meals: " + S.puppy.mealTimes.join(" · ") };
+      save(S);
+      pingScheduledMeals();
+      pushCloud(true);
+      render();
     };
     const apply2 = document.getElementById("apply2");
     if (apply2) apply2.onclick = () => {
       S.puppy.mealTimes = suggestedTimes(2);
       S.puppy.meals = 2;
-      save(S); render();
+      flash = { text: "Clock set to 2 meals: " + S.puppy.mealTimes.join(" · ") };
+      save(S);
+      pingScheduledMeals();
+      pushCloud(true);
+      render();
     };
     const clr = document.getElementById("clearPotty");
     if (clr) clr.onclick = () => { if (confirm("Clear potty history?")) { S.potty = []; save(S); render(); } };
@@ -1616,6 +1717,18 @@
       render();
     }, ms));
   }
+  let galTimer = null;
+  let galIdx = 0;
+  function startGallery() {
+    if (galTimer) clearInterval(galTimer);
+    const pics = loadPhotos();
+    const img = document.getElementById("galImg");
+    if (!img || pics.length < 2) return;
+    galTimer = setInterval(() => {
+      galIdx = (galIdx + 1) % pics.length;
+      img.src = pics[galIdx].src;
+    }, 5000);
+  }
   function scheduleReminders() {
     window._pgTimers.forEach(clearTimeout);
     window._pgTimers = [];
@@ -1629,7 +1742,7 @@
 
   render();
   const _render = render;
-  render = function () { _render(); scheduleReminders(); };
+  render = function () { _render(); scheduleReminders(); startGallery(); };
   scheduleReminders();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") syncCloud().then(r => { if (r && r.action === "pull") render(); });
@@ -1639,7 +1752,7 @@
   });
   setInterval(() => {
     syncCloud().then(r => { if (r && r.action === "pull") render(); });
-  }, 45000);
+  }, 15000);
   syncCloud().then(r => { if (r && r.action === "pull") render(); });
   </script>
 </body>
