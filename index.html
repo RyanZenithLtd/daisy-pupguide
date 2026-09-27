@@ -41,6 +41,13 @@
     .paw {
       width: 38px; height: 38px; border-radius: 12px; background: var(--terra);
       display: grid; place-items: center; font-size: 20px; color: #fff;
+      overflow: hidden; padding: 0;
+    }
+    .paw img { width: 38px; height: 38px; object-fit: cover; display: block; }
+    .daisy-top {
+      width: 56px; height: 56px; border-radius: 16px; object-fit: cover;
+      border: 2px solid #fff; box-shadow: 0 2px 8px rgba(44,28,20,.12);
+      background: #E8D9C8;
     }
     .brand h1 { font-size: 17px; margin: 0; letter-spacing: -0.02em; }
     .brand p { margin: 0; font-size: 12px; color: var(--muted); }
@@ -762,7 +769,7 @@
     root.innerHTML = `
       <header class="top">
         <div class="brand">
-          <div class="paw">🐾</div>
+          <div class="paw"><img src="https://i.postimg.cc/Mqf9fLm6/IMG-20260925-WA0007%281%29.jpg" alt="Daisy" /></div>
           <div>
             <h1>${escapeHtml(S.puppy.name || "Your puppy")}</h1>
             <p>PupGuide · reminders ${S.notify ? "ON" : "off"}</p>
@@ -854,6 +861,7 @@
     const fedN = todaysFeeds().length;
     const stage = mealStage();
     const mealGoal = stage.count;
+    const daisyPic = "https://i.postimg.cc/Mqf9fLm6/IMG-20260925-WA0007%281%29.jpg";
     const feedLine = !nxt ? "Add meal times on the Feed tab."
       : leftM <= 0 ? `${escapeHtml(S.puppy.name)} is due a meal now.`
       : leftM < 60 ? `Next meal in ${leftM} min · ${fmtTime(nxt)}`
@@ -862,6 +870,13 @@
       ? `${stage.label} until ${prettyDay(stage.until)} (${daysUntil(stage.until) === 0 ? "today" : daysUntil(stage.until) + " days"}) · then ${stage.next}`
       : `${stage.label} from here`;
     return `
+      <div style="display:flex;align-items:center;gap:12px;padding:0 2px 10px">
+        <img class="daisy-top" src="${daisyPic}" alt="Daisy" />
+        <div>
+          <b>Daisy</b>
+          <div class="tiny">${w} weeks · ${S.puppy.weightKg} kg</div>
+        </div>
+      </div>
       <div class="card">
         <div class="next">
           <div>
@@ -927,25 +942,7 @@
         </ul>
       </div>
       <div class="banner">If she is land-sharking, she is usually tired, not “dominant”. Put her down for a nap.</div>
-      ${galleryHTML()}
     `;
-  }
-
-  function galleryHTML() {
-    const pics = loadPhotos();
-    return `
-      <div class="card gallery">
-        <h2>${escapeHtml(S.puppy.name)}’s gallery</h2>
-        ${pics.length
-          ? `<img id="galImg" alt="${escapeHtml(S.puppy.name)}" src="${pics[0].src}" />`
-          : `<div class="empty-shot">🐾</div>`}
-        <p class="tiny" style="margin-top:8px">${pics.length ? pics.length + " photo" + (pics.length === 1 ? "" : "s") + " · rotates every few seconds" : "Add snaps of Daisy. They stay on this phone."}</p>
-        <div class="row">
-          <button class="btn sm sage" id="addPhotoBtn">Add photo</button>
-          ${pics.length ? `<button class="btn ghost sm" id="delPhotoBtn">Remove current</button>` : ""}
-        </div>
-        <input id="addPhoto" type="file" accept="image/*" capture="environment" hidden />
-      </div>`;
   }
 
   function feedHTML(w) {
