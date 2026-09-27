@@ -997,10 +997,14 @@
       </div>
       <div class="card">
         <h2>Meal times</h2>
-        <p class="muted">${stage.count === 4 ? "Four small meals for a tiny stomach. Last meal 10:15pm so she is not empty overnight. Potty 10–15 minutes after each bowl." : stage.count === 3 ? "Three meals. Last bowl earlier in the evening helps nights stay dry." : "Two meals, about 10–12 hours apart."}</p>
+        <p class="muted">${stage.count === 4 ? "Four small meals. Potty 10–15 minutes after each bowl. Test each slot so both phones buzz." : stage.count === 3 ? "Three meals. Last bowl earlier in the evening helps nights stay dry." : "Two meals, about 10–12 hours apart."}</p>
         ${times.map((t,i) => `
           <label class="field">Meal ${i+1}</label>
           <input type="time" data-meal-i="${i}" value="${t}" />
+          <div class="row" style="margin:-4px 0 10px">
+            <button class="btn ghost sm" data-test-meal="${i}" data-when="now">Test Meal ${i+1} now</button>
+            <button class="btn ghost sm" data-test-meal="${i}" data-when="15s">Test in 15s</button>
+          </div>
         `).join("")}
         <button class="btn sage sm" id="saveMeals" style="margin-top:10px">Save times &amp; sync</button>
       </div>
@@ -1612,6 +1616,23 @@
         S.puppy.mealTimes = grabMealTimes();
         save(S);
       };
+    });
+    document.querySelectorAll("[data-test-meal]").forEach(b => b.onclick = async () => {
+      S.puppy.mealTimes = grabMealTimes();
+      save(S);
+      const i = Number(b.dataset.testMeal);
+      const hm = (S.puppy.mealTimes || [])[i] || "";
+      const title = "TEST — Daisy meal " + (i + 1);
+      const body = "This is Meal " + (i + 1) + " at " + hm + ". If you see this, that slot’s ping works.";
+      const extra = b.dataset.when === "15s" ? { In: "15s", Tags: "daisy-meal-test" } : { Tags: "daisy-meal-test" };
+      const r = await ntfySend(title, body, extra);
+      pingNotify(title, body);
+      flash = r.ok
+        ? { text: b.dataset.when === "15s"
+            ? "Test booked. Phone shade should ping in about 15 seconds for Meal " + (i + 1) + " (" + hm + ")."
+            : "Test sent for Meal " + (i + 1) + " (" + hm + "). Check ntfy on both phones." }
+        : { text: "Test failed. " + (r.reason || "Set the house code in More and subscribe in ntfy."), tone: "warn" };
+      render();
     });
     const saveKg = document.getElementById("saveKg");
     if (saveKg) saveKg.onclick = () => {
