@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PupGuide" />
-  <title>PupGuide — Puppy Trainer</title>
+  <title>PupGuide 1.5.0 — Puppy Trainer</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     :root {
@@ -195,6 +195,8 @@
   <div class="app" id="app"></div>
 
   <script>
+  const APP_VERSION = "1.5.0";
+  const APP_UPDATED = "27 Sep 2026, 09:09 BST";
   const SKILLS = {
     "8-9": [
       { id: "marker", name: "Marker word (“Yes!”)", why: "Tells her the exact moment she did the right thing.", steps: ["Have treats ready in a quiet room.", "Say “Yes!” in a happy voice, then immediately give a tiny treat. Repeat 8–10 times.", "Do not ask for a behaviour yet. You are teaching that “Yes!” predicts food.", "Later, say “Yes!” the instant she looks at you or offers a sit."] },
@@ -772,7 +774,7 @@
           <div class="paw"><img src="https://i.postimg.cc/Mqf9fLm6/IMG-20260925-WA0007%281%29.jpg" alt="Daisy" /></div>
           <div>
             <h1>${escapeHtml(S.puppy.name || "Your puppy")}</h1>
-            <p>PupGuide · reminders ${S.notify ? "ON" : "off"}</p>
+            <p>v${APP_VERSION} · ${APP_UPDATED}</p>
           </div>
         </div>
         <div class="age-pill">${w} wk · ${S.puppy.weightKg || "?"}kg</div>
@@ -1238,8 +1240,7 @@
           <button class="btn ghost" id="cloudLoad">Force load</button>
         </div>
         <div class="row" style="margin-top:8px">
-          <button class="btn ghost sm" id="ntfyTest">Test partner ping</button>
-          <button class="btn ${S.notify?"ghost":""} sm" id="toggleNotify">${S.notify ? "Screen reminders OFF" : "Screen reminders ON"}</button>
+          <button class="btn ghost sm" id="ntfyTest">Test ntfy ping</button>
         </div>
         <h3 style="margin-top:16px">This phone’s name</h3>
         <p class="muted">Stays on this handset. Shows in “Daisy has been fed by …”.</p>
@@ -1278,6 +1279,7 @@
       </div>
       <div class="card">
         <h2>Data</h2>
+        <p class="tiny"><b>Version ${APP_VERSION}</b> · updated ${APP_UPDATED}</p>
         <p class="tiny">This phone still keeps a local copy. Cloud save is the extra copy that other devices can load.</p>
         <button class="btn ghost sm" id="exportBtn">Copy log as text</button>
         <button class="btn ghost sm warn" id="resetBtn">Reset app</button>
@@ -1286,27 +1288,6 @@
   }
 
   function bindView() {
-    async function enableReminders() {
-      if (S.notify) {
-        S.notify = false;
-        flash = { text: "Reminders are OFF. No pings until you turn them on again." };
-        save(S); render();
-        return;
-      }
-      let granted = false;
-      if ("Notification" in window) {
-        let perm = Notification.permission;
-        if (perm !== "granted") {
-          try { perm = await Notification.requestPermission(); } catch (e) { perm = "denied"; }
-        }
-        granted = perm === "granted";
-      }
-      S.notify = true;
-      flash = granted
-        ? { text: "Reminders are ON. Meals and nap check-ins only. Keep this tab open." }
-        : { text: "Reminders are ON in the app (meals + nap). Chrome may still block a lock-screen banner.", tone: "warn" };
-      save(S); render();
-    }
     function readHouseBox() {
       const el = document.getElementById("houseCode") || document.getElementById("syncCode");
       return el && el.value ? el.value.trim() : houseCode();
@@ -1392,22 +1373,6 @@
       const el = document.getElementById(id);
       if (el) el.onclick = pullCloud;
     });
-    const toggleNotify = document.getElementById("toggleNotify");
-    if (toggleNotify) toggleNotify.onclick = enableReminders;
-    const toggleNotifyHome = document.getElementById("toggleNotifyHome");
-    if (toggleNotifyHome) toggleNotifyHome.onclick = enableReminders;
-    const testNotify = document.getElementById("testNotify");
-    if (testNotify) testNotify.onclick = () => {
-      pingNotify("Daisy — test banner", "This is the reminder style for meals and nap check-ins.");
-      const locked = !("Notification" in window) || Notification.permission !== "granted";
-      flash = {
-        text: locked
-          ? "This is the in-app banner. Chrome blocked the lock-screen one for this file — that is expected. Leave the tab open to see these."
-          : "Banner OK. You should see this strip and a Chrome notification.",
-        tone: locked ? "warn" : ""
-      };
-      render();
-    };
     async function ntfySend(title, body, extraHeaders) {
       const topic = readHouseBox() || houseCode();
       if (!/^[a-zA-Z0-9_-]{8,64}$/.test(topic)) return { ok: false, reason: "no-topic" };
@@ -1623,7 +1588,6 @@
       const body = "This is Meal " + (i + 1) + " at " + hm + ". If you see this, that slot’s ping works.";
       const extra = b.dataset.when === "15s" ? { In: "15s", Tags: "daisy-meal-test" } : { Tags: "daisy-meal-test" };
       const r = await ntfySend(title, body, extra);
-      pingNotify(title, body);
       flash = r.ok
         ? { text: b.dataset.when === "15s"
             ? "Test booked. Phone shade should ping in about 15 seconds for Meal " + (i + 1) + " (" + hm + ")."
@@ -1702,66 +1666,13 @@
     return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
   }
 
-  window._pgTimers = window._pgTimers || [];
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
-  }
-  async function pingNotify(title, body) {
-    try { if (navigator.vibrate) navigator.vibrate([180, 80, 180]); } catch (e) {}
-    try {
-      document.title = "● " + title;
-      setTimeout(() => { document.title = "PupGuide — Puppy Trainer"; }, 8000);
-    } catch (e) {}
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification(title, {
-        body,
-        tag: title,
-        silent: false,
-        requireInteraction: true,
-        vibrate: [180, 80, 180]
-      });
-    } catch (e) {
-      try { new Notification(title, { body, tag: title }); } catch (err) {}
-    }
-  }
-  function armNotify(when, title, body) {
-    const ms = when.getTime() - Date.now();
-    if (ms < 800 || ms > 8 * 3600 * 1000) return;
-    window._pgTimers.push(setTimeout(() => {
-      flash = { text: title + " · " + body };
-      pingNotify(title, body);
-      render();
-    }, ms));
-  }
-  let galTimer = null;
-  let galIdx = 0;
-  function startGallery() {
-    if (galTimer) clearInterval(galTimer);
-    const pics = loadPhotos();
-    const img = document.getElementById("galImg");
-    if (!img || pics.length < 2) return;
-    galTimer = setInterval(() => {
-      galIdx = (galIdx + 1) % pics.length;
-      img.src = pics[galIdx].src;
-    }, 5000);
-  }
-  function scheduleReminders() {
-    window._pgTimers.forEach(clearTimeout);
-    window._pgTimers = [];
-    if (!S.notify || !S.onboarded) return;
-    const w = weeksOld(S.puppy.dob);
-    const meal = nextMealTime();
-    if (meal) armNotify(meal, "Daisy — meal", "Food time, then potty 10–15 minutes after");
-    const nap = activeNap();
-    if (nap) armNotify(napEndAt(nap), "Daisy — nap check", "Nap window is up. Carry her outside.");
   }
 
   render();
   const _render = render;
-  render = function () { _render(); scheduleReminders(); startGallery(); };
-  scheduleReminders();
+  render = function () { _render(); };
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") syncCloud().then(r => { if (r && r.action === "pull") render(); });
   });
