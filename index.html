@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PupGuide" />
-  <title>PupGuide 1.6.1 — Puppy Trainer</title>
+  <title>PupGuide 1.6.2 — Puppy Trainer</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     :root {
@@ -195,8 +195,8 @@
   <div class="app" id="app"></div>
 
   <script>
-  const APP_VERSION = "1.6.1";
-  const APP_UPDATED = "29 Sep 2026, 10:43 BST";
+  const APP_VERSION = "1.6.2";
+  const APP_UPDATED = "29 Sep 2026, 22:00 BST";
   const SKILLS = {
     "8-9": [
       { id: "marker", name: "Marker word (“Yes!”)", why: "Tells her the exact moment she did the right thing.", steps: ["Have treats ready in a quiet room.", "Say “Yes!” in a happy voice, then immediately give a tiny treat. Repeat 8–10 times.", "Do not ask for a behaviour yet. You are teaching that “Yes!” predicts food.", "Later, say “Yes!” the instant she looks at you or offers a sit."] },
@@ -310,7 +310,7 @@
     if (!Array.isArray(s.puppy.foods) || !s.puppy.foods.length || s.puppy.foods.some(f => /Iams/i.test((f && f.name) || ""))) {
       s.puppy.foods = DEFAULT.puppy.foods.map(f => ({ ...f }));
     }
-    if (!s.puppy.dailyKibbleG) s.puppy.dailyKibbleG = 280;
+    if (!s.puppy.dailyKibbleG || s.puppy.dailyKibbleG >= 260) s.puppy.dailyKibbleG = 180;
     if (!Array.isArray(s.feeds)) s.feeds = [];
     if (!Array.isArray(s.naps)) s.naps = [];
     if (!("nap" in s)) s.nap = null;
@@ -948,7 +948,7 @@
         <h2>Feeding plan</h2>
         <p class="muted">${(S.puppy.mealTimes || []).join(" · ") || "Set times on the Feed tab"}</p>
         <p class="tiny">${changeLine}</p>
-        <p class="tiny">${(S.puppy.dailyKibbleG || 280)} g kibble/day · ~${Math.round((S.puppy.dailyKibbleG || 280) / Math.max(1, mealGoal))} g a bowl + a tsp of Chum</p>
+        <p class="tiny">${(S.puppy.dailyKibbleG || 180)} g kibble/day · ~${Math.round((S.puppy.dailyKibbleG || 180) / Math.max(1, mealGoal))} g a bowl + a tsp of Chum + training treats</p>
         <p class="tiny">${(S.puppy.foods || []).map(f => typeof f === "string" ? f : f.name).join(" · ")}</p>
         <button class="btn ghost block" style="margin-top:10px" data-goto="feed">See full feeding plan</button>
         <p class="tiny" style="margin-top:10px">Forgot a bowl? This is set to the last one that has not been logged.</p>
@@ -1069,15 +1069,15 @@
           </div>
         `).join("")}
         <div class="banner green" style="margin-top:8px">
-          Golden / large adult (20–40 kg). Bag at 2–6 months: 260–430 g kibble a day over 4 meals.
-          Start Daisy on <b>280 g kibble a day</b> = <b>70 g per meal</b>, plus <b>1 teaspoon Pedigree Chum Puppy</b> in each bowl.
-          If stools stay firm and she is still hungry after 15 minutes, step toward 75–80 g kibble (300–320 g/day). Do not jump to 430 g while she is ~2 kg.
+          Cut back after a tight, bloated belly. New target: <b>40–50 g kibble per meal</b> (about <b>180 g a day</b> at 45 g × 4) plus <b>1 teaspoon Pedigree Chum</b> and rice-sized training treats.
+          The bag’s 260–430 g is for a typical large puppy, not a 1.9 kg belly that is already full.
         </div>
         <ul class="clean">
-          <li>70 g kibble + 1 tsp Chum, four times a day. Weigh the kibble. Guessing handfuls overfeeds Goldens.</li>
-          <li>A tablespoon of Chum ≈ knock 10 g off that meal’s kibble so the day does not creep up.</li>
-          <li>Wellness CORE treats: rice-sized. Subtract a pinch of kibble if you used a lot.</li>
-          <li>The bag’s 260–430 g is for expected adult size, not today’s 1.9 kg. 1.9 kg is small for an 8-week Golden — keep the low end until the next weigh-in and ask the vet if she is not gaining.</li>
+          <li>Start at <b>45 g kibble + 1 tsp Chum</b>, four times a day. Use 40 g if she still looks stuffed; 50 g if she is emptying the bowl and still wants the next treat.</li>
+          <li>Keep treats tiny and take them from the day’s 180 g. A heavy training session = 5–10 g less kibble in the next bowl.</li>
+          <li>A tablespoon of Chum ≈ knock 10 g off that meal’s kibble.</li>
+          <li>Soft, swollen belly + no interest in treats = too much food or eaten too fast. Smaller bowl, slower eat, then a nap.</li>
+          <li>The bag’s 260–430 g is expected-adult size. Stay well under that until she is putting on weight without a drum belly. Weigh weekly.</li>
           <li>At 6 months the bag says drop to 3 meals. Same daily grams, fewer bowls.</li>
           <li>Do not free-feed. Pick up leftovers after 15 minutes.</li>
         </ul>
