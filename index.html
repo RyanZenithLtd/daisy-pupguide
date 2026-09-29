@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PupGuide" />
-  <title>PupGuide 1.6.0 — Puppy Trainer</title>
+  <title>PupGuide 1.6.1 — Puppy Trainer</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     :root {
@@ -195,8 +195,8 @@
   <div class="app" id="app"></div>
 
   <script>
-  const APP_VERSION = "1.6.0";
-  const APP_UPDATED = "27 Sep 2026, 09:20 BST";
+  const APP_VERSION = "1.6.1";
+  const APP_UPDATED = "29 Sep 2026, 10:43 BST";
   const SKILLS = {
     "8-9": [
       { id: "marker", name: "Marker word (“Yes!”)", why: "Tells her the exact moment she did the right thing.", steps: ["Have treats ready in a quiet room.", "Say “Yes!” in a happy voice, then immediately give a tiny treat. Repeat 8–10 times.", "Do not ask for a behaviour yet. You are teaching that “Yes!” predicts food.", "Later, say “Yes!” the instant she looks at you or offers a sit."] },
@@ -270,8 +270,8 @@
       meals: 4,
       mealTimes: ["07:30", "12:00", "16:30", "22:15"],
       foods: [
-        { name: "Iams dry", kind: "kibble", note: "Main meals — follow the bag for a ~2 kg puppy, split across 4 feeds" },
-        { name: "Pedigree Chum Puppy", kind: "wet", note: "Can mix a spoon into kibble if she needs extra smell/moisture" },
+        { name: "Puppy kibble (large-breed bag)", kind: "kibble", note: "Expected adult 20–40 kg. Bag: 260–430 g/day at 2–6 months, split over 4 meals." },
+        { name: "Pedigree Chum Puppy", kind: "wet", note: "Mix a teaspoon into each bowl. If you use a full tablespoon, take ~10 g off the kibble." },
         { name: "Wellness CORE puppy treats", kind: "treat", note: "Training only — rice-sized pieces, count them toward the day’s food" }
       ]
     },
@@ -307,9 +307,10 @@
     if (!Array.isArray(s.puppy.mealTimes) || s.puppy.mealTimes.length < 2) {
       s.puppy.mealTimes = DEFAULT.puppy.mealTimes.slice();
     }
-    if (!Array.isArray(s.puppy.foods) || !s.puppy.foods.length) {
+    if (!Array.isArray(s.puppy.foods) || !s.puppy.foods.length || s.puppy.foods.some(f => /Iams/i.test((f && f.name) || ""))) {
       s.puppy.foods = DEFAULT.puppy.foods.map(f => ({ ...f }));
     }
+    if (!s.puppy.dailyKibbleG) s.puppy.dailyKibbleG = 280;
     if (!Array.isArray(s.feeds)) s.feeds = [];
     if (!Array.isArray(s.naps)) s.naps = [];
     if (!("nap" in s)) s.nap = null;
@@ -526,6 +527,20 @@
   }
   function loggedMealNs() {
     return new Set(todaysFeeds().map(f => Number(f.mealN)).filter(n => n > 0));
+  }
+  function nextMissedSlot() {
+    const times = (S.puppy.mealTimes || []).filter(Boolean);
+    const used = loggedMealNs();
+    const now = new Date();
+    for (let i = 0; i < times.length; i++) {
+      if (used.has(i + 1)) continue;
+      const t = parseHM(times[i]);
+      if (t.getTime() <= now.getTime() + 5 * 60000) return { n: i + 1, hm: times[i] };
+    }
+    for (let i = 0; i < times.length; i++) {
+      if (!used.has(i + 1)) return { n: i + 1, hm: times[i] };
+    }
+    return { n: 1, hm: (times[0] || "07:30") };
   }
   function inferMealN(when) {
     const times = (S.puppy.mealTimes || []).filter(Boolean);
@@ -933,13 +948,14 @@
         <h2>Feeding plan</h2>
         <p class="muted">${(S.puppy.mealTimes || []).join(" · ") || "Set times on the Feed tab"}</p>
         <p class="tiny">${changeLine}</p>
+        <p class="tiny">${(S.puppy.dailyKibbleG || 280)} g kibble/day · ~${Math.round((S.puppy.dailyKibbleG || 280) / Math.max(1, mealGoal))} g a bowl + a tsp of Chum</p>
         <p class="tiny">${(S.puppy.foods || []).map(f => typeof f === "string" ? f : f.name).join(" · ")}</p>
         <button class="btn ghost block" style="margin-top:10px" data-goto="feed">See full feeding plan</button>
-        <p class="tiny" style="margin-top:10px">Forgot to tap this morning?</p>
+        <p class="tiny" style="margin-top:10px">Forgot a bowl? This is set to the last one that has not been logged.</p>
         <div class="row">
-          <input class="field" id="missedTime" type="time" value="${(S.puppy.mealTimes && S.puppy.mealTimes[0]) || "07:30"}" style="flex:1" />
+          <input class="field" id="missedTime" type="time" value="${nextMissedSlot().hm}" style="flex:1" />
           <select class="field" id="missedN" style="flex:1">
-            ${(S.puppy.mealTimes || ["1","2","3","4"]).map((t,i) => `<option value="${i+1}">Meal ${i+1}${t && t.includes(":") ? " · " + t : ""}</option>`).join("")}
+            ${(S.puppy.mealTimes || ["1","2","3","4"]).map((t,i) => `<option value="${i+1}" ${nextMissedSlot().n === i+1 ? "selected" : ""}>Meal ${i+1}${t && t.includes(":") ? " · " + t : ""}</option>`).join("")}
           </select>
         </div>
         <button class="btn ghost sm" id="addMissed" style="margin-top:8px">Add missed meal</button>
@@ -1004,11 +1020,11 @@
         </div>
         ${feedLockMins() ? `<p class="tiny">Locked after the last bowl so two people don’t feed twice.</p>` : ""}
         ${toastHTML()}
-        <p class="tiny" style="margin-top:12px">Add a meal you already gave, at the time it happened.</p>
+        <p class="tiny" style="margin-top:12px">Defaults to the last unlogged bowl. Change the drop-down if it was a different meal.</p>
         <div class="row">
-          <input class="field" id="missedTime" type="time" value="${(S.puppy.mealTimes && S.puppy.mealTimes[0]) || "07:30"}" style="flex:1" />
+          <input class="field" id="missedTime" type="time" value="${nextMissedSlot().hm}" style="flex:1" />
           <select class="field" id="missedN" style="flex:1">
-            ${times.map((t,i) => `<option value="${i+1}">Meal ${i+1} · ${t}</option>`).join("")}
+            ${times.map((t,i) => `<option value="${i+1}" ${nextMissedSlot().n === i+1 ? "selected" : ""}>Meal ${i+1} · ${t}</option>`).join("")}
           </select>
         </div>
         <button class="btn ghost sm" id="addMissed" style="margin-top:8px">Add missed meal</button>
@@ -1052,12 +1068,18 @@
             </div>
           </div>
         `).join("")}
+        <div class="banner green" style="margin-top:8px">
+          Golden / large adult (20–40 kg). Bag at 2–6 months: 260–430 g kibble a day over 4 meals.
+          Start Daisy on <b>280 g kibble a day</b> = <b>70 g per meal</b>, plus <b>1 teaspoon Pedigree Chum Puppy</b> in each bowl.
+          If stools stay firm and she is still hungry after 15 minutes, step toward 75–80 g kibble (300–320 g/day). Do not jump to 430 g while she is ~2 kg.
+        </div>
         <ul class="clean">
-          <li>Measure Iams from the bag chart for a puppy around 2 kg. Split that daily amount across the 4 meal times.</li>
-          <li>Wellness CORE treats are high-value. Use them for name, sit and potty jackpots. Break them tiny. Subtract a pinch of kibble if you used a lot of treats.</li>
-          <li>If you mix Pedigree Chum Puppy into Iams, keep the wet amount small and consistent so her stomach and stools stay steady.</li>
-          <li>Do not free-feed. A bowl that sits out all day wrecks potty timing.</li>
-          <li>Pick up uneaten food after 15 minutes.</li>
+          <li>70 g kibble + 1 tsp Chum, four times a day. Weigh the kibble. Guessing handfuls overfeeds Goldens.</li>
+          <li>A tablespoon of Chum ≈ knock 10 g off that meal’s kibble so the day does not creep up.</li>
+          <li>Wellness CORE treats: rice-sized. Subtract a pinch of kibble if you used a lot.</li>
+          <li>The bag’s 260–430 g is for expected adult size, not today’s 1.9 kg. 1.9 kg is small for an 8-week Golden — keep the low end until the next weigh-in and ask the vet if she is not gaining.</li>
+          <li>At 6 months the bag says drop to 3 meals. Same daily grams, fewer bowls.</li>
+          <li>Do not free-feed. Pick up leftovers after 15 minutes.</li>
         </ul>
       </div>
       <div class="card">
@@ -1605,6 +1627,13 @@
       const when = new Date();
       logMeal(inferMealN(when), when, { live: true });
     });
+    const missedN = document.getElementById("missedN");
+    const missedTime = document.getElementById("missedTime");
+    if (missedN && missedTime) missedN.onchange = () => {
+      const times = S.puppy.mealTimes || [];
+      const i = Number(missedN.value) - 1;
+      if (times[i]) missedTime.value = times[i];
+    };
     const addMissed = document.getElementById("addMissed");
     if (addMissed) addMissed.onclick = () => {
       const hm = (document.getElementById("missedTime") || {}).value || "07:30";
