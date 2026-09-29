@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PupGuide" />
-  <title>PupGuide 1.6.2 — Puppy Trainer</title>
+  <title>PupGuide 1.6.3 — Puppy Trainer</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     :root {
@@ -31,6 +31,7 @@
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
     body { min-height: 100dvh; }
     button, input, select, textarea { font: inherit; }
+    a { color: var(--terra-d); }
     button { cursor: pointer; }
     .app { max-width: 480px; margin: 0 auto; min-height: 100dvh; background: var(--bg); position: relative; padding-bottom: var(--nav-h); }
     header.top {
@@ -195,8 +196,8 @@
   <div class="app" id="app"></div>
 
   <script>
-  const APP_VERSION = "1.6.2";
-  const APP_UPDATED = "29 Sep 2026, 22:00 BST";
+  const APP_VERSION = "1.6.3";
+  const APP_UPDATED = "29 Sep 2026, 22:15 BST";
   const SKILLS = {
     "8-9": [
       { id: "marker", name: "Marker word (“Yes!”)", why: "Tells her the exact moment she did the right thing.", steps: ["Have treats ready in a quiet room.", "Say “Yes!” in a happy voice, then immediately give a tiny treat. Repeat 8–10 times.", "Do not ask for a behaviour yet. You are teaching that “Yes!” predicts food.", "Later, say “Yes!” the instant she looks at you or offers a sit."] },
@@ -1081,6 +1082,35 @@
           <li>At 6 months the bag says drop to 3 meals. Same daily grams, fewer bowls.</li>
           <li>Do not free-feed. Pick up leftovers after 15 minutes.</li>
         </ul>
+      </div>
+      <div class="card">
+        <h2>What the guides say</h2>
+        <p class="muted">Saved here so you do not have to hunt it. Not a vet letter. Daisy is smaller than the “typical Golden” these charts assume.</p>
+        <h3 style="margin-top:12px">How often</h3>
+        <p class="tiny">8–12 weeks: 4 meals. 3–6 months: 3 meals. Then 2–3. Almost every Golden schedule agrees.</p>
+        <h3 style="margin-top:12px">Typical 8-week Golden weight</h3>
+        <p class="tiny">About 8–15 lb (3.6–6.8 kg), often ~10 lb / 4.5 kg. Daisy at ${S.puppy.weightKg} kg is well under that. Charts written for a 4–5 kg pup will overfill her.</p>
+        <h3 style="margin-top:12px">How many grams</h3>
+        <ul class="clean">
+          <li>Bag “large, 2–6 months”: 260–430 g/day — that is a wide band for a typical-sized pup across four months, not week 8 at 1.9 kg.</li>
+          <li>Expected-adult Golden (~25–32 kg) at 2 months: about 160–190 g kibble/day. Our 180 g (45 g × 4) sits in that band.</li>
+          <li>By current body weight (~130–160 kcal/kg): a 1.9 kg pup is closer to 70–100 g kibble/day. Use this if the belly stays tight.</li>
+          <li>Cup charts saying 1½–2 cups/day assume a 10–12 lb Golden. Weigh grams instead.</li>
+        </ul>
+        <h3 style="margin-top:12px">Also worth keeping</h3>
+        <ul class="clean">
+          <li>Large-breed puppy food so calcium and calories stay controlled as she grows.</li>
+          <li>Ribs easy to feel. A hard balloon belly means cut the next bowl, not add more.</li>
+          <li>Water stays down. Thirst after treats is normal; emptying the bowl all day plus huge pale wees is a vet question.</li>
+          <li>Change food over 7–10 days. Treats count in the daily grams.</li>
+        </ul>
+        <h3 style="margin-top:12px">Sources</h3>
+        <p class="tiny"><a href="https://goldenretriever.hair/guides/golden-retriever-puppy-feeding-schedule-chart" target="_blank" rel="noopener">Meal frequency by age</a></p>
+        <p class="tiny"><a href="https://www.petcro.com/blog/golden-retriever-puppy-feeding-chart" target="_blank" rel="noopener">Grams by expected adult weight (2 months ≈ 160–190 g)</a></p>
+        <p class="tiny"><a href="https://www.petcro.com/blog/8-week-old-puppy-feeding-schedule" target="_blank" rel="noopener">kcal/kg and grams by current weight</a></p>
+        <p class="tiny"><a href="https://goldenretrieverinsight.com/8-week-old-golden-retriever/" target="_blank" rel="noopener">Typical 8-week Golden weight</a></p>
+        <p class="tiny"><a href="https://devotedtodog.com/golden-retriever-puppy-feeding-chart/" target="_blank" rel="noopener">Cup chart for a typical-sized 8-week Golden</a></p>
+        <p class="tiny"><a href="https://articles.hepper.com/how-much-to-feed-golden-retriever-puppy/" target="_blank" rel="noopener">Vet-reviewed frequency and large-breed food</a></p>
       </div>
       <div class="card">
         <h2>Weight</h2>
