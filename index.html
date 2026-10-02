@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PupGuide" />
-  <title>PupGuide 1.6.3 — Puppy Trainer</title>
+  <title>PupGuide 1.7.0 — Puppy Trainer</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     :root {
@@ -196,8 +196,8 @@
   <div class="app" id="app"></div>
 
   <script>
-  const APP_VERSION = "1.6.3";
-  const APP_UPDATED = "29 Sep 2026, 22:15 BST";
+  const APP_VERSION = "1.7.0";
+  const APP_UPDATED = "2 Oct 2026, 19:06 BST";
   const SKILLS = {
     "8-9": [
       { id: "marker", name: "Marker word (“Yes!”)", why: "Tells her the exact moment she did the right thing.", steps: ["Have treats ready in a quiet room.", "Say “Yes!” in a happy voice, then immediately give a tiny treat. Repeat 8–10 times.", "Do not ask for a behaviour yet. You are teaching that “Yes!” predicts food.", "Later, say “Yes!” the instant she looks at you or offers a sit."] },
@@ -294,7 +294,10 @@
     whoAmI: "",
     baths: [],
     grooms: [],
-    vet: []
+    vet: [],
+    cats: { mealTimes: ["07:30", "17:00"] },
+    catFeeds: [],
+    catPingKey: ""
   };
 
   const $ = (sel, el=document) => el.querySelector(sel);
@@ -325,10 +328,15 @@
     if (!s.updatedAt) s.updatedAt = Date.now();
     if (!s.ntfyTopic) s.ntfyTopic = "";
     if (!s.whoAmI) s.whoAmI = "";
-    if (!Array.isArray(s.baths)) s.baths = [];
+    if (!s.cats || !Array.isArray(s.cats.mealTimes) || s.cats.mealTimes.length < 2) {
+      s.cats = { mealTimes: ["07:30", "17:00"] };
+    }
+    if (!Array.isArray(s.catFeeds)) s.catFeeds = [];
+    if (!s.catPingKey) s.catPingKey = "";
     if (!Array.isArray(s.grooms)) s.grooms = [];
     if (!Array.isArray(s.vet)) s.vet = [];
     if (!s.vet.length) s.vet = seedVetEvents(s.puppy.dob);
+    s.vet = stampDaisyJabs(s.vet);
     if (!Array.isArray(s.weights) || !s.weights.length) s.weights = [{ kg: s.puppy.weightKg, note: "starting weight" }];
     if (!s.puppy.dropTo3 || !s.puppy.dropTo2) {
       const plan = defaultMealPlan(s.puppy.dob);
@@ -588,6 +596,33 @@
     if (!list.length) return null;
     return list.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
   }
+  function todaysCatFeeds() {
+    const k = todayKey();
+    return (S.catFeeds || []).filter(f => todayKey(new Date(f.ts)) === k);
+  }
+  function loggedCatNs() {
+    return new Set(todaysCatFeeds().map(f => Number(f.mealN)).filter(n => n > 0));
+  }
+  function nextCatMeal() {
+    const times = ((S.cats && S.cats.mealTimes) || ["07:30", "17:00"]).filter(Boolean);
+    const used = loggedCatNs();
+    const now = new Date();
+    for (let i = 0; i < times.length; i++) {
+      if (used.has(i + 1)) continue;
+      const d = parseHM(times[i]);
+      if (d.getTime() > now.getTime() - 2 * 60000) return d;
+    }
+    const d = parseHM(times[0] || "07:30");
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+  function catLockMins() {
+    const list = S.catFeeds || [];
+    if (!list.length) return 0;
+    const last = list.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
+    const left = 45 - Math.round((Date.now() - new Date(last.ts).getTime()) / 60000);
+    return left > 0 ? left : 0;
+  }
   function lastBath() {
     if (!S.baths || !S.baths.length) return null;
     return S.baths.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
@@ -598,13 +633,30 @@
     const add = (days, kind, title) => {
       out.push({ id: "vet-" + kind + "-" + days, kind, title, due: ymd(addDays(b, days)), done: null });
     };
-    add(56, "vax", "Vaccine 1 (often already given)");
-    add(70, "vax", "Vaccine 2");
-    add(84, "vax", "Vaccine 3 / Lepto");
+    add(56, "vax", "Vaccine 1 — given 23 Sep");
+    add(70, "vax", "Vaccine 2 — due 21 Oct");
+    add(84, "vax", "Vaccine 3 / Lepto — confirm with vet");
     add(56, "chip", "Microchip check (UK law by 8 weeks)");
     [56, 70, 84, 112, 140, 168].forEach((d, i) => add(d, "worm", "Wormer " + (i + 1)));
     add(70, "flea", "Start flea treatment (vet product)");
     add(365, "vax", "First annual booster (approx)");
+    return stampDaisyJabs(out);
+  }
+  function stampDaisyJabs(list) {
+    const out = Array.isArray(list) ? list.map(v => ({ ...v })) : [];
+    const put = (match, title, due, done) => {
+      const i = out.findIndex(v => /vaccine\s*1|vaccine\s*2|vaccine\s*3/i.test(v.title || "") && new RegExp(match, "i").test(v.title || ""));
+      if (i >= 0) {
+        out[i].title = title;
+        out[i].due = due;
+        if (done) out[i].done = done;
+      } else {
+        out.push({ id: "vet-" + match.replace(/\s+/g, "-"), kind: "vax", title, due, done: done || null });
+      }
+    };
+    put("vaccine\\s*1", "Vaccine 1 — given 23 Sep", "2026-09-23", "2026-09-23");
+    put("vaccine\\s*2", "Vaccine 2 — due 21 Oct (4 weeks after 23 Sep)", "2026-10-21", null);
+    put("vaccine\\s*3", "Vaccine 3 / Lepto — confirm on the card (often ~4 weeks after #2)", "2026-11-18", null);
     return out;
   }
   function fearPeriod(w) {
@@ -941,8 +993,10 @@
         <p class="tiny">${fedN}/${mealGoal} meals logged today · ${S.puppy.weightKg} kg</p>
         <div class="row" style="margin-top:8px">
           ${feedLockMins() ? `<button class="btn sage" disabled>I FED DAISY · wait ${feedLockMins()} min</button>` : `<button class="btn sage" data-fed="yes">I FED DAISY</button>`}
+          ${catLockMins() ? `<button class="btn ghost" disabled>I FED CATS · ${catLockMins()}m</button>` : `<button class="btn ghost" data-fed-cats="yes">I FED CATS</button>`}
         </div>
         ${feedLockMins() ? `<p class="tiny">Last bowl ${fmtTime(new Date(lastFeed().ts))}${lastFeed().by ? " · " + escapeHtml(lastFeed().by) : ""}. Button unlocks so you don’t double-feed.</p>` : ""}
+        <p class="tiny">Cats at ${(S.cats.mealTimes || []).join(" · ")} · next ${fmtTime(nextCatMeal())} · ${todaysCatFeeds().length}/2 logged</p>
         ${toastHTML()}
       </div>
       <div class="card">
@@ -1018,6 +1072,7 @@
         <p class="muted">${!nxt ? "Set meal times below." : leftM <= 0 ? "Due now. Then potty 10–15 minutes after she finishes." : `Next meal in ${leftM} min.`}</p>
         <div class="row" style="margin-top:8px">
           ${feedLockMins() ? `<button class="btn sage" disabled>I FED DAISY · wait ${feedLockMins()} min</button>` : `<button class="btn sage" data-fed="yes">I FED DAISY</button>`}
+          ${catLockMins() ? `<button class="btn ghost" disabled>I FED CATS · ${catLockMins()}m</button>` : `<button class="btn ghost" data-fed-cats="yes">I FED CATS</button>`}
         </div>
         ${feedLockMins() ? `<p class="tiny">Locked after the last bowl so two people don’t feed twice.</p>` : ""}
         ${toastHTML()}
@@ -1657,6 +1712,39 @@
       const when = new Date();
       logMeal(inferMealN(when), when, { live: true });
     });
+    function logCats(when) {
+      const times = (S.cats && S.cats.mealTimes) || ["07:30", "17:00"];
+      const used = loggedCatNs();
+      let n = 1;
+      let best = Infinity;
+      times.forEach((hm, i) => {
+        const d = Math.abs(parseHM(hm).getTime() - when.getTime());
+        if (!used.has(i + 1) && d < best) { best = d; n = i + 1; }
+      });
+      const id = uid();
+      const by = feederName();
+      S.catFeeds = S.catFeeds || [];
+      S.catFeeds.push({ id, ts: when.toISOString(), mealN: n, by, label: "Cats meal " + n });
+      const nxt = nextCatMeal();
+      const byBit = by ? " by " + by : "";
+      ntfySend("Cats have been fed", "Both cats, meal " + n + " at " + fmtTime(when) + byBit + ". Don’t feed them again.");
+      if (nxt) {
+        const wait = Math.max(1, minsUntil(nxt));
+        const key = ymd(nxt) + " " + fmtTime(nxt);
+        if (wait <= 3 * 24 * 60 && S.catPingKey !== key) {
+          S.catPingKey = key;
+          ntfySend("Cats — feed time " + fmtTime(nxt), "Morning 7:30 or evening 5pm bowl for both cats.", {
+            Delay: String(Math.floor(nxt.getTime() / 1000)),
+            Tags: "cats-meal"
+          });
+        }
+      }
+      flash = { text: "Cats logged · " + fmtTime(when) + byBit + ". Partner ping sent.", undo: { kind: "cats", id } };
+      save(S);
+      pushCloud(true);
+      render();
+    }
+    document.querySelectorAll("[data-fed-cats]").forEach(b => b.onclick = () => logCats(new Date()));
     const missedN = document.getElementById("missedN");
     const missedTime = document.getElementById("missedTime");
     if (missedN && missedTime) missedN.onchange = () => {
@@ -1694,6 +1782,7 @@
       const [kind, id] = b.dataset.undo.split(":");
       if (kind === "feed") S.feeds = S.feeds.filter(f => f.id !== id);
       if (kind === "potty") S.potty = S.potty.filter(p => p.id !== id);
+      if (kind === "cats") S.catFeeds = (S.catFeeds || []).filter(f => f.id !== id);
       flash = { text: "Undone." };
       save(S); render();
     });
@@ -1801,6 +1890,19 @@
     if (rst) rst.onclick = () => {
       if (confirm("Erase all logs and start over?")) { S = structuredClone(DEFAULT); save(S); tab = "home"; render(); }
     };
+    const nxtCat = nextCatMeal();
+    if (nxtCat && houseCode()) {
+      const key = ymd(nxtCat) + " " + fmtTime(nxtCat);
+      const wait = minsUntil(nxtCat);
+      if (S.catPingKey !== key && wait >= 1 && wait <= 20 * 60) {
+        S.catPingKey = key;
+        save(S, { dirty: false });
+        ntfySend("Cats — feed time " + fmtTime(nxtCat), "Both cats. Bowls at 7:30am and 5pm.", {
+          Delay: String(Math.floor(nxtCat.getTime() / 1000)),
+          Tags: "cats-meal"
+        });
+      }
+    }
   }
 
   function friendlyTs(iso) {
